@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>家庭財務</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    body { background-color: #0d0d1a; }
+    .tab-active { color: #818cf8; }
+    .tab-inactive { color: #6b7280; }
+    .num-btn { background: #1e1e35; border-radius: 50%; width: 72px; height: 72px;
+               font-size: 1.5rem; display: flex; align-items: center; justify-content: center;
+               cursor: pointer; transition: background 0.1s; }
+    .num-btn:active { background: #2d2d50; }
+    .cat-btn { padding: 12px 8px; border-radius: 12px; background: #1e1e35;
+               display: flex; flex-direction: column; align-items: center; gap: 4px;
+               cursor: pointer; transition: all 0.1s; border: 2px solid transparent; }
+    .cat-btn:active, .cat-btn.selected { border-color: #818cf8; background: #2d2d50; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #2d2d50; border-radius: 2px; }
+  </style>
+</head>
+<body class="text-white min-h-screen" x-data x-init="$store.auth.init()" x-cloak>
+
+<!-- ================================================================
+  登入頁
+================================================================ -->
+<div x-show="!$store.auth.loggedIn" x-data="LoginPage()"
+     class="min-h-screen flex flex-col items-center justify-center px-6 py-12">
+
+  <!-- Logo -->
+  <div class="text-center mb-10">
+    <div class="text-6xl mb-3">🏠</div>
+    <h1 class="text-3xl font-bold text-white">家庭財務</h1>
+    <p class="text-gray-400 mt-2 text-sm">James & 佳文</p>
+  </div>
+
+  <!-- 選人物 -->
+  <p class="text-gray-400 text-sm mb-4">你是誰？</p>
+  <div class="grid grid-cols-2 gap-4 w-full max-w-xs mb-8">
+    <template x-for="u in $root.CONFIG_USERS" :key="u.id">
+      <button @click="selectUser(u.id)"
+              :class="selectedUser === u.id
+                ? 'border-2 border-indigo-400 bg-[#1e2040]'
+                : 'border-2 border-gray-700 bg-[#1a1a2e]'"
+              class="rounded-2xl p-5 text-center transition-all">
+        <div class="text-4xl mb-2" x-text="u.avatar"></div>
+        <div class="font-semibold text-white" x-text="u.name"></div>
+      </button>
+    </template>
+  </div>
+
+  <!-- 密碼 -->
+  <div class="w-full max-w-xs mb-4">
+    <input x-model="password" type="password" placeholder="輸入密碼"
+           @keyup.enter="submit()"
+           class="w-full bg-[#1a1a2e] border border-gray-700 rounded-xl px-4 py-3
+                  text-white placeholder-gray-500 text-center text-lg tracking-widest
+                  focus:outline-none focus:border-indigo-400">
+  </div>
+
+  <!-- 錯誤訊息 -->
+  <p x-show="error" x-text="error" class="text-red-400 text-sm mb-4"></p>
+
+  <!-- 登入按鈕 -->
+  <button @click="submit()" :disabled="loading"
+          class="w-full max-w-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50
+                 text-white font-semibold py-3.5 rounded-xl transition-colors text-lg">
+    <span x-show="!loading">進入 App</span>
+    <span x-show="loading">驗證中…</span>
+  </button>
+</div>
+
+<!-- 隱藏資料傳入 Alpine -->
+<div hidden id="cfg-users" :data-users="JSON.stringify(CONFIG.USERS)"></div>
+<script>
+  // 讓 Alpine 能讀到 CONFIG
+  document.addEventListener('alpine:init', () => {
+    Alpine.magic('users', () => CONFIG.USERS);
+  });
+</script>
+
+<!-- 修正：讓 LoginPage 能讀到 USERS -->
+<script>
+  // patch LoginPage to get users from CONFIG
+  const _origLoginPage = LoginPage;
+  function LoginPage() {
+    const base = _origLoginPage();
+    base.CONFIG_USERS = CONFIG.USERS;
+    return base;
+  }
+</script>
+
+<!-- ================================================================
+  主 App
+================================================================ -->
+<div x-show="$store.auth.loggedIn" class="min-h-screen flex flex-col">
+
+  <!-- ---- 電腦版：側欄 ---- -->
+  <div class="hidden lg:flex fixed inset-y-0 left-0 w-60 bg-[#111126] border-r border-gray-800 flex-col z-20">
+    <!-- Logo -->
+    <div class="px-6 py-5 border-b border-gray-800">
+      <div class="text-xl font-bold text-white">🏠 家庭財務</div>
+    </div>
+    <!-- 用戶 -->
+    <div class="px-4 py-3 border-b border-gray-800 flex items-center gap-3">
+      <span class="text-2xl" x-text="$store.auth.user?.avatar"></span>
+      <span class="text-sm font-medium" x-text="$store.auth.user?.name"></span>
+    </div>
+    <!-- 導覽 -->
+    <nav class="flex-1 px-3 py-4 space-y-1">
+      <template x-for="item in [
+        {tab:'today',    icon:'📅', label:'今天'},
+        {tab:'accounts', icon:'💳', label:'帳戶'},
+        {tab:'budget',   icon:'📊', label:'預算'},
+        {tab:'reports',  icon:'📈', label:'報表'}
+      ]" :key="item.tab">
+        <button @click="$store.nav.setTab(item.tab)"
+                :class="$store.nav.tab === item.tab
+                  ? 'bg-indigo-600/20 text-indigo-400'
+                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'"
+                class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-sm font-medium transition-colors">
+          <span x-text="item.icon"></span>
+          <span x-text="item.label"></span>
+        </button>
+      </template>
+    </nav>
+    <!-- 登出 -->
+    <div class="px-3 py-4 border-t border-gray-800">
+      <button @click="$store.auth.logout()"
+              class="w-full text-gray-500 hover:text-red-400 text-sm px-4 py-2 rounded-xl
+                     hover:bg-gray-800 transition-colors text-left">
+        登出
+      </button>
+    </div>
+  </div>
+
+  <!-- ---- 主內容區 ---- -->
+  <div class="flex-1 lg:ml-60 pb-20 lg:pb-0">
+
+    <!-- 頂部（手機版） -->
+    <div class="lg:hidden flex items-center justify-between px-4 py-3 sticky top-0 bg-[#0d0d1a]/90 backdrop-blur z-10 border-b border-gray-800/50">
+      <div class="text-lg font-bold">
+        <span x-show="$store.nav.tab === 'today'">今天</span>
+        <span x-show="$store.nav.tab === 'accounts'">帳戶</span>
+        <span x-show="$store.nav.tab === 'budget'">預算</span>
+        <span x-show="$store.nav.tab === 'reports'">報表</span>
+      </div>
+      <div class="flex items-center gap-2 text-sm text-gray-400">
+        <span x-text="$store.auth.user?.avatar"></span>
+        <span x-text="$store.auth.user?.name"></span>
+      </div>
+    </div>
+
+    <!-- 今天頁 -->
+    <div x-show="$store.nav.tab === 'today'"
+         x-data="TodayPage()" x-init="init()"
+         @tx-added.window="init()">
+
+      <!-- 快速記帳按鈕（加在全局 modal 上） -->
+      <div class="px-4 pt-4 pb-2">
+        <button @click="$dispatch('open-add-modal')"
+                class="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700
+                       text-white font-semibold py-4 rounded-2xl text-lg transition-colors
+                       flex items-center justify-center gap-2">
+          <span class="text-2xl">＋</span>記一筆
+        </button>
+      </div>
+
+      <!-- 載入中 -->
+      <div x-show="loading" class="flex justify-center py-12">
+        <div class="animate-spin text-3xl">⏳</div>
+      </div>
+
+      <!-- 最近記帳 -->
+      <div x-show="!loading" class="px-4 py-2">
+        <h3 class="text-gray-400 text-xs uppercase tracking-wider mb-3">本月記帳</h3>
+
+        <div x-show="recentTx.length === 0" class="text-center py-8 text-gray-500">
+          <div class="text-4xl mb-2">📝</div>
+          <p class="text-sm">還沒有記帳，按上面的按鈕開始！</p>
+        </div>
+
+        <div class="space-y-2">
+          <template x-for="tx in recentTx" :key="tx.id">
+            <div class="bg-[#1a1a2e] rounded-xl px-4 py-3 flex items-center gap-3">
+              <div class="text-2xl w-10 text-center" x-text="getCatIcon(tx.category_id)"></div>
+              <div class="flex-1 min-w-0">
+                <div class="font-medium text-sm text-white" x-text="getCatName(tx.category_id)"></div>
+                <div class="text-xs text-gray-400 truncate" x-text="(tx.note || '') + ' ' + (tx.created_by === 'jiawen' ? '佳文' : 'James')"></div>
+              </div>
+              <div class="text-right">
+                <div :class="tx.direction === 'income' ? 'text-green-400' : 'text-white'"
+                     class="font-semibold text-sm"
+                     x-text="(tx.direction === 'income' ? '+' : '-') + '$' + formatMoney(tx.amount)"></div>
+                <div class="text-xs text-gray-500" x-text="formatDate(tx.date)"></div>
+              </div>
+              <button @click="deleteTx(tx.id)"
+                      class="text-gray-600 hover:text-red-400 ml-1 text-lg leading-none">×</button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- 帳戶頁 -->
+    <div x-show="$store.nav.tab === 'accounts'"
+         x-data="AccountsPage()" x-init="init()">
+
+      <div x-show="loading" class="flex justify-center py-12">
+        <div class="animate-spin text-3xl">⏳</div>
+      </div>
+
+      <div x-show="!loading" class="px-4 pt-4">
+        <!-- 總覽 -->
+        <div class="grid grid-cols-2 gap-3 mb-6">
+          <div class="bg-[#1a1a2e] rounded-2xl p-4">
+            <div class="text-gray-400 text-xs mb-1">可用現金</div>
+            <div class="text-green-400 text-xl font-bold" x-text="'$' + formatMoney(totalCash)"></div>
+          </div>
+          <div class="bg-[#1a1a2e] rounded-2xl p-4">
+            <div class="text-gray-400 text-xs mb-1">信用卡已刷</div>
+            <div class="text-red-400 text-xl font-bold" x-text="'$' + formatMoney(totalCredit)"></div>
+          </div>
+        </div>
+
+        <!-- 付款帳戶 -->
+        <h3 class="text-gray-400 text-xs uppercase tracking-wider mb-3">付款帳戶</h3>
+        <div x-show="bankAccounts.length === 0" class="text-gray-500 text-sm mb-4 px-2">
+          尚未設定帳戶，請在 Google Sheet 的 accounts 分頁填入。
+        </div>
+        <div class="space-y-2 mb-6">
+          <template x-for="acc in bankAccounts" :key="acc.id">
+            <div class="bg-[#1a1a2e] rounded-xl px-4 py-3 flex items-center justify-between">
+              <div>
+                <div class="font-medium text-sm text-white" x-text="acc.name"></div>
+                <div class="text-xs text-gray-500" x-text="acc.owner === 'jiawen' ? '佳文' : acc.owner === 'james' ? 'James' : '共同'"></div>
+              </div>
+              <div class="text-green-400 font-semibold text-sm" x-text="'$' + formatMoney(acc.balance)"></div>
+            </div>
+          </template>
+        </div>
+
+        <!-- 信用卡 -->
+        <h3 class="text-gray-400 text-xs uppercase tracking-wider mb-3">信用卡</h3>
+        <div class="space-y-2">
+          <template x-for="acc in creditCards" :key="acc.id">
+            <div class="bg-[#1a1a2e] rounded-xl px-4 py-3 flex items-center justify-between">
+              <div>
+                <div class="font-medium text-sm text-white" x-text="acc.name"></div>
+                <div class="text-xs text-gray-500" x-text="acc.owner === 'jiawen' ? '佳文' : 'James'"></div>
+              </div>
+              <div class="text-red-400 font-semibold text-sm" x-text="'$' + formatMoney(acc.balance)"></div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- 預算頁 -->
+    <div x-show="$store.nav.tab === 'budget'"
+         x-data="BudgetPage()" x-init="init()">
+
+      <div x-show="loading" class="flex justify-center py-12">
+        <div class="animate-spin text-3xl">⏳</div>
+      </div>
+
+      <div x-show="!loading && dashboard" class="px-4 pt-4">
+
+        <!-- 月份標題 + 總覽 -->
+        <div class="bg-[#1a1a2e] rounded-2xl p-4 mb-6">
+          <div class="text-gray-400 text-xs mb-2" x-text="month + ' 預算總覽'"></div>
+          <div class="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <div class="text-green-400 font-bold text-lg" x-text="'$' + formatMoney(dashboard?.income?.total)"></div>
+              <div class="text-gray-500 text-xs">收入</div>
+            </div>
+            <div>
+              <div class="text-red-400 font-bold text-lg" x-text="'$' + formatMoney(dashboard?.expense?.total)"></div>
+              <div class="text-gray-500 text-xs">支出</div>
+            </div>
+            <div>
+              <div :class="(dashboard?.balance || 0) >= 0 ? 'text-green-400' : 'text-red-400'"
+                   class="font-bold text-lg" x-text="'$' + formatMoney(dashboard?.balance)"></div>
+              <div class="text-gray-500 text-xs">結餘</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 待分類提醒 -->
+        <div x-show="dashboard?.uncategorized?.count > 0"
+             class="bg-yellow-900/30 border border-yellow-700/50 rounded-xl px-4 py-3 mb-4 flex items-center gap-2">
+          <span class="text-yellow-400">⚠️</span>
+          <span class="text-yellow-300 text-sm"
+                x-text="`有 ${dashboard.uncategorized.count} 筆待分類（共 $${formatMoney(dashboard.uncategorized.amount)}）`"></span>
+        </div>
+
+        <!-- 各類別預算進度 -->
+        <div class="space-y-2">
+          <template x-for="item in (dashboard?.budgetSummary || [])" :key="item.category_id">
+            <div x-show="item.budget > 0 || item.actual > 0"
+                 class="bg-[#1a1a2e] rounded-xl px-4 py-3">
+              <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg" x-text="item.icon || '•'"></span>
+                  <span class="text-sm font-medium text-white" x-text="item.category_name"></span>
+                </div>
+                <div class="text-right">
+                  <span :class="statusColor(item.status)" class="text-sm font-semibold"
+                        x-text="'$' + formatMoney(item.actual)"></span>
+                  <span class="text-gray-500 text-xs" x-text="' / $' + formatMoney(item.budget)"></span>
+                </div>
+              </div>
+              <div x-show="item.budget > 0" class="bg-gray-800 rounded-full h-1.5">
+                <div :class="barColor(item.status)" class="h-1.5 rounded-full transition-all"
+                     :style="`width: ${pct(item.actual, item.budget)}%`"></div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- 報表頁 -->
+    <div x-show="$store.nav.tab === 'reports'"
+         x-data="ReportsPage()" x-init="init()">
+
+      <div x-show="loading" class="flex justify-center py-12">
+        <div class="animate-spin text-3xl">⏳</div>
+      </div>
+
+      <div x-show="!loading && dashboard" class="px-4 pt-4 space-y-4">
+
+        <!-- 淨資產 -->
+        <div class="bg-gradient-to-br from-indigo-900/50 to-purple-900/50 border border-indigo-700/30 rounded-2xl p-5">
+          <div class="text-gray-300 text-sm mb-1">家庭淨資產（估算）</div>
+          <div class="text-white text-3xl font-bold" x-text="'$' + formatMoney(dashboard?.netWorth)"></div>
+          <div class="text-gray-400 text-xs mt-2">現金 + 投資 − 信用卡未付款</div>
+        </div>
+
+        <!-- 投資快照 -->
+        <div x-show="dashboard?.investment" class="bg-[#1a1a2e] rounded-2xl p-4">
+          <div class="text-gray-400 text-xs mb-3">投資總覽（最新週報）</div>
+          <div class="flex items-end justify-between">
+            <div>
+              <div class="text-white text-2xl font-bold"
+                   x-text="'$' + formatMoney(dashboard?.investment?.total_value)"></div>
+              <div class="text-gray-400 text-xs mt-1"
+                   x-text="'更新日：' + (dashboard?.investment?.snapshot_date || '—')"></div>
+            </div>
+            <div class="text-right">
+              <div :class="(dashboard?.investment?.weekly_change || 0) >= 0 ? 'text-green-400' : 'text-red-400'"
+                   class="text-lg font-semibold"
+                   x-text="((dashboard?.investment?.weekly_change || 0) >= 0 ? '+' : '') + '$' + formatMoney(dashboard?.investment?.weekly_change)"></div>
+              <div class="text-gray-500 text-xs">本週</div>
+            </div>
+          </div>
+        </div>
+        <div x-show="!dashboard?.investment" class="bg-[#1a1a2e] rounded-2xl p-4 text-center">
+          <div class="text-gray-500 text-sm">尚未匯入投資週報快照</div>
+        </div>
+
+        <!-- 夢想帳戶 -->
+        <div>
+          <h3 class="text-gray-400 text-xs uppercase tracking-wider mb-3">夢想帳戶</h3>
+          <div class="space-y-2">
+            <template x-for="d in (dashboard?.dreamAccounts || [])" :key="d.id">
+              <div class="bg-[#1a1a2e] rounded-xl px-4 py-3">
+                <div class="flex items-center justify-between mb-2">
+                  <div class="flex items-center gap-2">
+                    <span class="text-lg" x-text="d.icon || '🎯'"></span>
+                    <span class="text-sm font-medium text-white" x-text="d.name"></span>
+                  </div>
+                  <div class="text-right">
+                    <span class="text-indigo-400 text-sm font-semibold"
+                          x-text="'$' + formatMoney(d.current_amount)"></span>
+                    <span class="text-gray-500 text-xs"
+                          x-text="' / $' + formatMoney(d.target_amount)"></span>
+                  </div>
+                </div>
+                <div class="bg-gray-800 rounded-full h-1.5">
+                  <div class="bg-indigo-500 h-1.5 rounded-full"
+                       :style="`width: ${Math.min(100, Math.round((d.current_amount / d.target_amount) * 100))}%`"></div>
+                </div>
+                <div class="text-gray-500 text-xs mt-1"
+                     x-text="`每月 +$${formatMoney(d.monthly_deposit)} ｜ 達成 ${Math.round((d.current_amount / d.target_amount) * 100)}%`"></div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- end 主內容區 -->
+
+  <!-- ---- 手機底部 Tab Bar ---- -->
+  <div class="lg:hidden fixed bottom-0 left-0 right-0 bg-[#111126] border-t border-gray-800 safe-area-bottom z-20">
+    <div class="grid grid-cols-4">
+      <template x-for="item in [
+        {tab:'today',    icon:'📅', label:'今天'},
+        {tab:'accounts', icon:'💳', label:'帳戶'},
+        {tab:'budget',   icon:'📊', label:'預算'},
+        {tab:'reports',  icon:'📈', label:'報表'}
+      ]" :key="item.tab">
+        <button @click="$store.nav.setTab(item.tab)"
+                :class="$store.nav.tab === item.tab ? 'text-indigo-400' : 'text-gray-500'"
+                class="flex flex-col items-center py-3 text-xs gap-1 active:opacity-70">
+          <span class="text-xl" x-text="item.icon"></span>
+          <span x-text="item.label"></span>
+        </button>
+      </template>
+    </div>
+  </div>
+
+</div><!-- end 主 App -->
+
+<!-- ================================================================
+  記帳 Modal（全局）
+================================================================ -->
+<div x-data="AddModal()"
+     @open-add-modal.window="open()"
+     x-show="show"
+     x-transition:enter="transition ease-out duration-200"
+     x-transition:enter-start="opacity-0 translate-y-full"
+     x-transition:enter-end="opacity-100 translate-y-0"
+     x-transition:leave="transition ease-in duration-150"
+     x-transition:leave-start="opacity-100 translate-y-0"
+     x-transition:leave-end="opacity-0 translate-y-full"
+     class="fixed inset-0 z-50 flex flex-col">
+
+  <!-- 遮罩 -->
+  <div class="flex-1 bg-black/60" @click="close()"></div>
+
+  <!-- Modal 內容 -->
+  <div class="bg-[#111126] rounded-t-3xl overflow-hidden max-h-[90vh] flex flex-col">
+
+    <!-- 頂部 handle + 標題 -->
+    <div class="flex items-center justify-between px-5 pt-4 pb-3 border-b border-gray-800">
+      <button @click="close()" class="text-gray-400 text-sm">取消</button>
+      <div class="w-10 h-1 bg-gray-600 rounded-full absolute left-1/2 -translate-x-1/2 top-2"></div>
+      <h2 class="font-semibold text-white">記一筆</h2>
+      <div class="w-10"></div>
+    </div>
+
+    <!-- 收入/支出切換 -->
+    <div class="flex gap-2 px-5 py-3">
+      <button @click="direction = 'expense'; selectedCat = null"
+              :class="direction === 'expense' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400'"
+              class="flex-1 py-2 rounded-xl text-sm font-medium transition-colors">支出</button>
+      <button @click="direction = 'income'; selectedCat = null"
+              :class="direction === 'income' ? 'bg-green-600 text-white' : 'bg-gray-800 text-gray-400'"
+              class="flex-1 py-2 rounded-xl text-sm font-medium transition-colors">收入</button>
+    </div>
+
+    <!-- Step: 金額 -->
+    <div x-show="step === 'amount'" class="flex-1 overflow-y-auto">
+
+      <!-- 金額顯示 -->
+      <div class="text-center py-6 px-5">
+        <div class="text-5xl font-light text-white min-h-[60px]"
+             x-text="amountStr ? '$' + amountStr : '$0'"></div>
+      </div>
+
+      <!-- 數字鍵盤 -->
+      <div class="grid grid-cols-3 gap-3 px-8 pb-4">
+        <template x-for="n in [1,2,3,4,5,6,7,8,9]" :key="n">
+          <button @click="pressNum(n)" class="num-btn mx-auto text-white font-medium" x-text="n"></button>
+        </template>
+        <button @click="pressDot()" class="num-btn mx-auto text-white">.</button>
+        <button @click="pressNum(0)" class="num-btn mx-auto text-white font-medium">0</button>
+        <button @click="pressBack()" class="num-btn mx-auto text-gray-400">⌫</button>
+      </div>
+
+      <!-- 下一步 -->
+      <div class="px-5 pb-6">
+        <button @click="nextStep()"
+                :disabled="!amount || amount <= 0"
+                class="w-full bg-indigo-600 disabled:opacity-30 text-white font-semibold py-4 rounded-2xl text-lg">
+          選擇類別 →
+        </button>
+      </div>
+    </div>
+
+    <!-- Step: 類別 -->
+    <div x-show="step === 'category'" class="flex-1 overflow-y-auto px-4 pb-6">
+      <div class="flex items-center gap-3 py-3 mb-2">
+        <button @click="step = 'amount'" class="text-gray-400 text-sm">← 回去</button>
+        <div class="text-white font-medium">
+          <span x-text="direction === 'expense' ? '支出' : '收入'"></span>
+          <span class="text-indigo-400 ml-2" x-text="'$' + amountStr"></span>
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-2">
+        <template x-for="cat in displayCats" :key="cat.id">
+          <button @click="selectCat(cat)"
+                  :class="selectedCat?.id === cat.id ? 'selected' : ''"
+                  class="cat-btn text-center">
+            <span class="text-2xl" x-text="cat.icon || '•'"></span>
+            <span class="text-xs text-gray-300 leading-tight text-center" x-text="cat.name"></span>
+          </button>
+        </template>
+      </div>
+    </div>
+
+    <!-- Step: 確認 -->
+    <div x-show="step === 'confirm'" class="flex-1 overflow-y-auto px-5 pb-6">
+      <div class="flex items-center gap-3 py-3 mb-4">
+        <button @click="step = 'category'" class="text-gray-400 text-sm">← 回去</button>
+        <div class="text-white font-medium">確認記帳</div>
+      </div>
+
+      <!-- 摘要卡 -->
+      <div class="bg-[#1e1e35] rounded-2xl p-5 mb-5">
+        <div class="text-center mb-4">
+          <div class="text-4xl mb-2" x-text="selectedCat?.icon || '•'"></div>
+          <div class="text-gray-400 text-sm" x-text="selectedCat?.name"></div>
+          <div :class="direction === 'income' ? 'text-green-400' : 'text-white'"
+               class="text-4xl font-bold mt-2"
+               x-text="(direction === 'income' ? '+' : '-') + '$' + amountStr"></div>
+        </div>
+
+        <!-- 備註 -->
+        <input x-model="note" type="text" placeholder="備註（可不填）"
+               class="w-full bg-[#0d0d1a] border border-gray-700 rounded-xl px-4 py-3
+                      text-white placeholder-gray-600 text-sm focus:outline-none focus:border-indigo-400 mb-3">
+
+        <!-- 帳戶選擇 -->
+        <select x-model="selectedAccount" x-show="accounts.length > 0"
+                class="w-full bg-[#0d0d1a] border border-gray-700 rounded-xl px-4 py-3
+                       text-white text-sm focus:outline-none focus:border-indigo-400">
+          <option value="">不指定帳戶</option>
+          <template x-for="acc in accounts" :key="acc.id">
+            <option :value="acc.id" x-text="acc.name"></option>
+          </template>
+        </select>
+      </div>
+
+      <!-- 送出 -->
+      <button @click="submit()" :disabled="loading || done"
+              :class="done ? 'bg-green-600' : 'bg-indigo-600 hover:bg-indigo-500'"
+              class="w-full disabled:opacity-50 text-white font-semibold py-4 rounded-2xl text-lg transition-colors">
+        <span x-show="!loading && !done">記下來 ✓</span>
+        <span x-show="loading && !done">記帳中…</span>
+        <span x-show="done">✅ 完成！</span>
+      </button>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>
