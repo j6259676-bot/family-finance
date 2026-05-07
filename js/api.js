@@ -17,9 +17,10 @@ const Api = {
   },
 
   async post(action, data = {}) {
+    // 使用 text/plain 避免 CORS preflight（Apps Script 不回應 OPTIONS）
     const res = await fetch(CONFIG.API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({ action, data, token: this._token })
     });
     const json = await res.json();
