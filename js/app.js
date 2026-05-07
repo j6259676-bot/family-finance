@@ -29,6 +29,8 @@ document.addEventListener('alpine:init', () => {
       Api.init(token);
       this.loggedIn = true;
       localStorage.setItem('hf_auth', JSON.stringify({ user, token }));
+      // 通知各頁面元件可以開始載入資料
+      window.dispatchEvent(new CustomEvent('auth-login'));
       return true;
     },
 
@@ -87,11 +89,19 @@ function TodayPage() {
     transactions: [],
     categories: [],
     accounts: [],
-    loading: true,
+    loading: false,
     showAddModal: false,
 
-    async init() {
-      if (!Alpine.store('auth').loggedIn) return;
+    init() {
+      if (Alpine.store('auth').loggedIn) {
+        this.loadData();
+      } else {
+        window.addEventListener('auth-login', () => this.loadData(), { once: true });
+      }
+      window.addEventListener('tx-added', () => this.loadData());
+    },
+
+    async loadData() {
       this.loading = true;
       try {
         const month = currentMonth();
@@ -237,10 +247,17 @@ function AddModal() {
 function AccountsPage() {
   return {
     accounts: [],
-    loading: true,
+    loading: false,
 
-    async init() {
-      if (!Alpine.store('auth').loggedIn) return;
+    init() {
+      if (Alpine.store('auth').loggedIn) {
+        this.loadData();
+      } else {
+        window.addEventListener('auth-login', () => this.loadData(), { once: true });
+      }
+    },
+
+    async loadData() {
       this.loading = true;
       try { this.accounts = await Api.getAccounts(); }
       catch (e) { console.error(e); }
@@ -268,11 +285,18 @@ function AccountsPage() {
 function BudgetPage() {
   return {
     dashboard: null,
-    loading: true,
+    loading: false,
     month: currentMonth(),
 
-    async init() {
-      if (!Alpine.store('auth').loggedIn) return;
+    init() {
+      if (Alpine.store('auth').loggedIn) {
+        this.loadData();
+      } else {
+        window.addEventListener('auth-login', () => this.loadData(), { once: true });
+      }
+    },
+
+    async loadData() {
       this.loading = true;
       try { this.dashboard = await Api.getDashboard(this.month); }
       catch (e) { console.error(e); }
@@ -304,11 +328,18 @@ function BudgetPage() {
 function ReportsPage() {
   return {
     dashboard: null,
-    loading: true,
+    loading: false,
     month: currentMonth(),
 
-    async init() {
-      if (!Alpine.store('auth').loggedIn) return;
+    init() {
+      if (Alpine.store('auth').loggedIn) {
+        this.loadData();
+      } else {
+        window.addEventListener('auth-login', () => this.loadData(), { once: true });
+      }
+    },
+
+    async loadData() {
       this.loading = true;
       try { this.dashboard = await Api.getDashboard(this.month); }
       catch (e) { console.error(e); }
