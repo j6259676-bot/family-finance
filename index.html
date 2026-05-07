@@ -45,7 +45,7 @@
   <!-- 選人物 -->
   <p class="text-gray-400 text-sm mb-4">你是誰？</p>
   <div class="grid grid-cols-2 gap-4 w-full max-w-xs mb-8">
-    <template x-for="u in CONFIG_USERS" :key="u.id">
+    <template x-for="u in CONFIG.USERS" :key="u.id">
       <button @click="selectUser(u.id)"
               :class="selectedUser === u.id
                 ? 'border-2 border-indigo-400 bg-[#1e2040]'
@@ -78,25 +78,6 @@
   </button>
 </div>
 
-<!-- 隱藏資料傳入 Alpine -->
-<div hidden id="cfg-users" :data-users="JSON.stringify(CONFIG.USERS)"></div>
-<script>
-  // 讓 Alpine 能讀到 CONFIG
-  document.addEventListener('alpine:init', () => {
-    Alpine.magic('users', () => CONFIG.USERS);
-  });
-</script>
-
-<!-- 修正：讓 LoginPage 能讀到 USERS -->
-<script>
-  // patch LoginPage to get users from CONFIG
-  const _origLoginPage = LoginPage;
-  function LoginPage() {
-    const base = _origLoginPage();
-    base.CONFIG_USERS = CONFIG.USERS;
-    return base;
-  }
-</script>
 
 <!-- ================================================================
   主 App

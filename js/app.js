@@ -91,6 +91,7 @@ function TodayPage() {
     showAddModal: false,
 
     async init() {
+      if (!Alpine.store('auth').loggedIn) return;
       this.loading = true;
       try {
         const month = currentMonth();
@@ -239,6 +240,7 @@ function AccountsPage() {
     loading: true,
 
     async init() {
+      if (!Alpine.store('auth').loggedIn) return;
       this.loading = true;
       try { this.accounts = await Api.getAccounts(); }
       catch (e) { console.error(e); }
@@ -270,6 +272,7 @@ function BudgetPage() {
     month: currentMonth(),
 
     async init() {
+      if (!Alpine.store('auth').loggedIn) return;
       this.loading = true;
       try { this.dashboard = await Api.getDashboard(this.month); }
       catch (e) { console.error(e); }
@@ -305,6 +308,7 @@ function ReportsPage() {
     month: currentMonth(),
 
     async init() {
+      if (!Alpine.store('auth').loggedIn) return;
       this.loading = true;
       try { this.dashboard = await Api.getDashboard(this.month); }
       catch (e) { console.error(e); }
