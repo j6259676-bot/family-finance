@@ -157,14 +157,16 @@ function AddModal() {
 
     async open() {
       this.reset();
-      if (!this.categories.length) {
-        [this.categories, this.accounts] = await Promise.all([
-          Api.getCategories(),
-          Api.getAccounts()
-        ]);
-      }
-      this.show = true;
+      this.show = true;      // 先顯示 Modal，不等 API
       this.step = 'amount';
+      if (!this.categories.length) {
+        try {
+          [this.categories, this.accounts] = await Promise.all([
+            Api.getCategories(),
+            Api.getAccounts()
+          ]);
+        } catch(e) { console.error('載入類別失敗', e); }
+      }
     },
 
     close() { this.show = false; this.reset(); },
