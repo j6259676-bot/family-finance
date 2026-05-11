@@ -431,14 +431,17 @@
       <div class="w-10"></div>
     </div>
 
-    <!-- 收入/支出切換 -->
+    <!-- 收入/支出/轉帳切換 -->
     <div class="flex gap-2 px-5 py-3">
-      <button @click="direction = 'expense'; selectedCat = null"
+      <button @click="direction = 'expense'; selectedCat = null; step = 'amount'"
               :class="direction === 'expense' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400'"
               class="flex-1 py-2 rounded-xl text-sm font-medium transition-colors">支出</button>
-      <button @click="direction = 'income'; selectedCat = null"
+      <button @click="direction = 'income'; selectedCat = null; step = 'amount'"
               :class="direction === 'income' ? 'bg-green-600 text-white' : 'bg-gray-800 text-gray-400'"
               class="flex-1 py-2 rounded-xl text-sm font-medium transition-colors">收入</button>
+      <button @click="direction = 'transfer'; selectedCat = null; step = 'amount'"
+              :class="direction === 'transfer' ? 'bg-orange-600 text-white' : 'bg-gray-800 text-gray-400'"
+              class="flex-1 py-2 rounded-xl text-sm font-medium transition-colors">轉帳</button>
     </div>
 
     <!-- Step: 金額 -->
@@ -464,8 +467,70 @@
       <div class="px-5 pb-6">
         <button @click="nextStep()"
                 :disabled="!amount || amount <= 0"
-                class="w-full bg-indigo-600 disabled:opacity-30 text-white font-semibold py-4 rounded-2xl text-lg">
-          選擇類別 →
+                :class="direction === 'transfer' ? 'bg-orange-600' : 'bg-indigo-600'"
+                class="w-full disabled:opacity-30 text-white font-semibold py-4 rounded-2xl text-lg">
+          <span x-text="direction === 'transfer' ? '選擇帳戶 →' : '選擇類別 →'"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Step: 轉帳帳戶 -->
+    <div x-show="step === 'transfer-accounts'" class="flex-1 overflow-y-auto px-5 pb-6">
+      <div class="flex items-center gap-3 py-3 mb-4">
+        <button @click="step = 'amount'" class="text-gray-400 text-sm">← 回去</button>
+        <div class="text-white font-medium">
+          轉帳 <span class="text-orange-400 ml-1" x-text="'$' + amountStr"></span>
+        </div>
+      </div>
+
+      <div class="space-y-4">
+        <!-- 轉出帳戶 -->
+        <div>
+          <div class="text-gray-400 text-xs mb-2 uppercase tracking-wider">從哪個帳戶轉出</div>
+          <div class="space-y-2">
+            <template x-for="acc in accounts" :key="'from-' + acc.id">
+              <button @click="fromAccountId = acc.id"
+                      :class="fromAccountId === acc.id
+                        ? 'border-orange-500 bg-orange-900/20'
+                        : 'border-gray-700 bg-[#1e1e35]'"
+                      class="w-full border rounded-xl px-4 py-3 flex items-center justify-between transition-colors">
+                <span class="text-white text-sm" x-text="acc.name"></span>
+                <span x-show="fromAccountId === acc.id" class="text-orange-400 text-sm">✓</span>
+              </button>
+            </template>
+          </div>
+        </div>
+
+        <!-- 轉入帳戶 -->
+        <div>
+          <div class="text-gray-400 text-xs mb-2 uppercase tracking-wider">轉到哪個帳戶</div>
+          <div class="space-y-2">
+            <template x-for="acc in accounts" :key="'to-' + acc.id">
+              <button @click="toAccountId = acc.id"
+                      :disabled="acc.id === fromAccountId"
+                      :class="toAccountId === acc.id
+                        ? 'border-green-500 bg-green-900/20'
+                        : acc.id === fromAccountId
+                          ? 'border-gray-800 bg-gray-900/50 opacity-40 cursor-not-allowed'
+                          : 'border-gray-700 bg-[#1e1e35]'"
+                      class="w-full border rounded-xl px-4 py-3 flex items-center justify-between transition-colors">
+                <span class="text-white text-sm" x-text="acc.name"></span>
+                <span x-show="toAccountId === acc.id" class="text-green-400 text-sm">✓</span>
+              </button>
+            </template>
+          </div>
+        </div>
+
+        <!-- 備註 -->
+        <input x-model="note" type="text" placeholder="備註（可不填）"
+               class="w-full bg-[#0d0d1a] border border-gray-700 rounded-xl px-4 py-3
+                      text-white placeholder-gray-600 text-sm focus:outline-none focus:border-orange-400">
+
+        <!-- 確認轉帳 -->
+        <button @click="confirmTransfer()"
+                :disabled="!fromAccountId || !toAccountId"
+                class="w-full bg-orange-600 disabled:opacity-30 text-white font-semibold py-4 rounded-2xl text-lg">
+          確認轉帳 →
         </button>
       </div>
     </div>
@@ -494,12 +559,13 @@
     <!-- Step: 確認 -->
     <div x-show="step === 'confirm'" class="flex-1 overflow-y-auto px-5 pb-6">
       <div class="flex items-center gap-3 py-3 mb-4">
-        <button @click="step = 'category'" class="text-gray-400 text-sm">← 回去</button>
+        <button @click="step = direction === 'transfer' ? 'transfer-accounts' : 'category'"
+                class="text-gray-400 text-sm">← 回去</button>
         <div class="text-white font-medium">確認記帳</div>
       </div>
 
-      <!-- 摘要卡 -->
-      <div class="bg-[#1e1e35] rounded-2xl p-5 mb-5">
+      <!-- 一般記帳摘要 -->
+      <div x-show="direction !== 'transfer'" class="bg-[#1e1e35] rounded-2xl p-5 mb-5">
         <div class="text-center mb-4">
           <div class="text-4xl mb-2" x-text="selectedCat?.icon || '•'"></div>
           <div class="text-gray-400 text-sm" x-text="selectedCat?.name"></div>
@@ -507,13 +573,9 @@
                class="text-4xl font-bold mt-2"
                x-text="(direction === 'income' ? '+' : '-') + '$' + amountStr"></div>
         </div>
-
-        <!-- 備註 -->
         <input x-model="note" type="text" placeholder="備註（可不填）"
                class="w-full bg-[#0d0d1a] border border-gray-700 rounded-xl px-4 py-3
                       text-white placeholder-gray-600 text-sm focus:outline-none focus:border-indigo-400 mb-3">
-
-        <!-- 帳戶選擇 -->
         <select x-model="selectedAccount" x-show="accounts.length > 0"
                 class="w-full bg-[#0d0d1a] border border-gray-700 rounded-xl px-4 py-3
                        text-white text-sm focus:outline-none focus:border-indigo-400">
@@ -524,12 +586,32 @@
         </select>
       </div>
 
+      <!-- 轉帳摘要 -->
+      <div x-show="direction === 'transfer'" class="bg-[#1e1e35] rounded-2xl p-5 mb-5">
+        <div class="text-center mb-5">
+          <div class="text-orange-400 text-4xl font-bold">$<span x-text="amountStr"></span></div>
+          <div class="text-gray-400 text-sm mt-1">帳戶轉帳</div>
+        </div>
+        <div class="flex items-center gap-3 justify-center mb-4">
+          <div class="flex-1 bg-[#0d0d1a] rounded-xl px-3 py-2 text-center">
+            <div class="text-gray-400 text-xs mb-1">轉出</div>
+            <div class="text-white text-sm font-medium" x-text="getAccountName(fromAccountId)"></div>
+          </div>
+          <div class="text-orange-400 text-xl">→</div>
+          <div class="flex-1 bg-[#0d0d1a] rounded-xl px-3 py-2 text-center">
+            <div class="text-gray-400 text-xs mb-1">轉入</div>
+            <div class="text-white text-sm font-medium" x-text="getAccountName(toAccountId)"></div>
+          </div>
+        </div>
+        <div class="text-gray-500 text-xs text-center">轉帳不計入收入或支出</div>
+      </div>
+
       <!-- 送出 -->
       <button @click="submit()" :disabled="loading || done"
-              :class="done ? 'bg-green-600' : 'bg-indigo-600 hover:bg-indigo-500'"
+              :class="done ? 'bg-green-600' : direction === 'transfer' ? 'bg-orange-600 hover:bg-orange-500' : 'bg-indigo-600 hover:bg-indigo-500'"
               class="w-full disabled:opacity-50 text-white font-semibold py-4 rounded-2xl text-lg transition-colors">
-        <span x-show="!loading && !done">記下來 ✓</span>
-        <span x-show="loading && !done">記帳中…</span>
+        <span x-show="!loading && !done" x-text="direction === 'transfer' ? '確認轉帳 ✓' : '記下來 ✓'"></span>
+        <span x-show="loading && !done">處理中…</span>
         <span x-show="done">✅ 完成！</span>
       </button>
     </div>

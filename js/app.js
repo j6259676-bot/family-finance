@@ -144,12 +144,14 @@ function TodayPage() {
 function AddModal() {
   return {
     show: false,
-    step: 'amount',   // amount | category | confirm
-    direction: 'expense',
+    step: 'amount',   // amount | category | transfer-accounts | confirm
+    direction: 'expense',  // expense | income | transfer
     amountStr: '',
     selectedCat: null,
     note: '',
     selectedAccount: null,
+    fromAccountId: null,   // 轉帳：來源帳戶
+    toAccountId: null,     // 轉帳：目標帳戶
     categories: [],
     accounts: [],
     loading: false,
@@ -157,7 +159,7 @@ function AddModal() {
 
     async open() {
       this.reset();
-      this.show = true;      // 先顯示 Modal，不等 API
+      this.show = true;
       this.step = 'amount';
       if (!this.categories.length) {
         try {
@@ -174,6 +176,7 @@ function AddModal() {
     reset() {
       this.step = 'amount'; this.amountStr = ''; this.selectedCat = null;
       this.note = ''; this.selectedAccount = null; this.direction = 'expense';
+      this.fromAccountId = null; this.toAccountId = null;
       this.done = false;
     },
 
@@ -201,11 +204,14 @@ function AddModal() {
     get displayCats() {
       return this.direction === 'expense' ? this.expenseCats : this.incomeCats;
     },
+    get nonCreditAccounts() {
+      return this.accounts.filter(a => a.type !== 'credit');
+    },
 
     nextStep() {
       if (this.step === 'amount') {
         if (!this.amount || this.amount <= 0) { alert('請輸入金額'); return; }
-        this.step = 'category';
+        this.step = this.direction === 'transfer' ? 'transfer-accounts' : 'category';
       }
     },
 
@@ -214,24 +220,46 @@ function AddModal() {
       this.step = 'confirm';
     },
 
+    confirmTransfer() {
+      if (!this.fromAccountId) { alert('請選擇轉出帳戶'); return; }
+      if (!this.toAccountId)   { alert('請選擇轉入帳戶'); return; }
+      if (this.fromAccountId === this.toAccountId) { alert('轉出和轉入帳戶不能相同'); return; }
+      this.step = 'confirm';
+    },
+
+    getAccountName(id) {
+      const a = this.accounts.find(a => a.id === id);
+      return a ? a.name : id;
+    },
+
     async submit() {
       if (this.loading) return;
       this.loading = true;
       try {
         const user = Alpine.store('auth').user;
-        await Api.addTransaction({
-          date: new Date().toISOString().split('T')[0],
-          amount: this.amount,
-          direction: this.direction,
-          category_id: this.selectedCat.id,
-          note: this.note,
-          account_id: this.selectedAccount || '',
-          created_by: user.id
-        });
+        if (this.direction === 'transfer') {
+          await Api.addTransfer({
+            date: new Date().toISOString().split('T')[0],
+            amount: this.amount,
+            from_account_id: this.fromAccountId,
+            to_account_id: this.toAccountId,
+            note: this.note || '帳戶轉帳',
+            created_by: user.id
+          });
+        } else {
+          await Api.addTransaction({
+            date: new Date().toISOString().split('T')[0],
+            amount: this.amount,
+            direction: this.direction,
+            category_id: this.selectedCat.id,
+            note: this.note,
+            account_id: this.selectedAccount || '',
+            created_by: user.id
+          });
+        }
         this.done = true;
         setTimeout(() => {
           this.close();
-          // 通知今天頁重新載入
           window.dispatchEvent(new CustomEvent('tx-added'));
         }, 800);
       } catch (e) {
