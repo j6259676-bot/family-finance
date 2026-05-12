@@ -37,6 +37,9 @@ const Api = {
   getDreamAccounts()       { return this.get('getDreamAccounts'); },
   getInvestment()          { return this.get('getInvestment'); },
   getRecurringRules()      { return this.get('getRecurringRules'); },
+  getBudgetSummary(startDate, endDate) {
+    return this.get('getBudgetSummary', { startDate, endDate });
+  },
 
   // 寫入
   addTransaction(data)       { return this.post('addTransaction', data); },

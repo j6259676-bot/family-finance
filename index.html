@@ -6,6 +6,7 @@
   <title>家庭財務</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
   <script src="js/app.js"></script>
@@ -318,6 +319,63 @@
       </div>
 
       <div x-show="!loading && dashboard" class="px-4 pt-4 space-y-4">
+
+        <!-- 花費分析圖表 -->
+        <div class="bg-[#1a1a2e] rounded-2xl p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-white font-semibold text-sm">花費分析</h3>
+            <div class="flex gap-1.5">
+              <button @click="setThisMonth()"
+                      :class="rangeMode==='month' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400'"
+                      class="text-xs px-2.5 py-1 rounded-lg transition-colors">本月</button>
+              <button @click="setLastMonth()"
+                      :class="rangeMode==='last' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400'"
+                      class="text-xs px-2.5 py-1 rounded-lg transition-colors">上月</button>
+              <button @click="rangeMode='custom'"
+                      :class="rangeMode==='custom' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400'"
+                      class="text-xs px-2.5 py-1 rounded-lg transition-colors">自訂</button>
+            </div>
+          </div>
+
+          <!-- 自訂日期 -->
+          <div x-show="rangeMode==='custom'" class="flex gap-2 mb-3 items-center">
+            <input type="date" x-model="startDate"
+                   class="flex-1 bg-gray-800 text-white text-xs rounded-lg px-2 py-1.5 border border-gray-700 focus:outline-none focus:border-indigo-500">
+            <span class="text-gray-500 text-xs">—</span>
+            <input type="date" x-model="endDate"
+                   class="flex-1 bg-gray-800 text-white text-xs rounded-lg px-2 py-1.5 border border-gray-700 focus:outline-none focus:border-indigo-500">
+            <button @click="loadSummary()"
+                    class="bg-indigo-600 text-white text-xs px-3 py-1.5 rounded-lg whitespace-nowrap">查詢</button>
+          </div>
+
+          <!-- 摘要數字 -->
+          <div x-show="summary" class="grid grid-cols-3 gap-2 mb-4">
+            <div class="bg-gray-800/60 rounded-xl p-2.5 text-center">
+              <div class="text-gray-400 text-xs mb-0.5">總預算</div>
+              <div class="text-white text-sm font-semibold" x-text="'$' + formatMoney(summary?.totalBudget)"></div>
+            </div>
+            <div class="bg-gray-800/60 rounded-xl p-2.5 text-center">
+              <div class="text-gray-400 text-xs mb-0.5">實際支出</div>
+              <div :class="(summary?.totalExpense||0)>(summary?.totalBudget||0)?'text-red-400':'text-white'"
+                   class="text-sm font-semibold" x-text="'$' + formatMoney(summary?.totalExpense)"></div>
+            </div>
+            <div class="bg-gray-800/60 rounded-xl p-2.5 text-center">
+              <div class="text-gray-400 text-xs mb-0.5">收支結餘</div>
+              <div :class="(summary?.surplus||0)>=0?'text-green-400':'text-red-400'"
+                   class="text-sm font-semibold"
+                   x-text="((summary?.surplus||0)>=0?'+':'')+'$'+formatMoney(summary?.surplus)"></div>
+            </div>
+          </div>
+
+          <!-- 圖表 -->
+          <div x-show="chartLoading" class="flex justify-center py-8">
+            <div class="animate-spin text-2xl">⏳</div>
+          </div>
+          <div x-show="!chartLoading && summary" style="height:320px;position:relative;">
+            <canvas id="budgetChart"></canvas>
+          </div>
+          <div x-show="!chartLoading && !summary" class="text-center py-8 text-gray-500 text-sm">載入中…</div>
+        </div>
 
         <!-- 淨資產 -->
         <div class="bg-gradient-to-br from-indigo-900/50 to-purple-900/50 border border-indigo-700/30 rounded-2xl p-5">

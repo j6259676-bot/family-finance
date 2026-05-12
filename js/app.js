@@ -353,15 +353,33 @@ function BudgetPage() {
 }
 
 // ============================================================
-// 報表頁（儀表板）
+// 報表頁（儀表板 + 花費分析圖表）
 // ============================================================
 function ReportsPage() {
   return {
     dashboard: null,
+    summary: null,
     loading: false,
+    chartLoading: false,
     month: currentMonth(),
+    startDate: '',
+    endDate: '',
+    rangeMode: 'month',
+    _chart: null,
 
     init() {
+      const today = new Date();
+      const m = currentMonth();
+      this.startDate = m + '-01';
+      this.endDate = today.toISOString().slice(0, 10);
+
+      // 切換到報表 tab 時重繪圖表（x-show 隱藏時 canvas 尺寸為 0）
+      this.$watch('$store.nav.tab', tab => {
+        if (tab === 'reports' && this.summary && !this._chart) {
+          this.$nextTick(() => this.renderChart());
+        }
+      });
+
       if (Alpine.store('auth').loggedIn) {
         this.loadData();
       } else {
@@ -371,9 +389,120 @@ function ReportsPage() {
 
     async loadData() {
       this.loading = true;
-      try { this.dashboard = await Api.getDashboard(this.month); }
-      catch (e) { console.error(e); }
+      this.chartLoading = true;
+      try {
+        [this.dashboard, this.summary] = await Promise.all([
+          Api.getDashboard(this.month),
+          Api.getBudgetSummary(this.startDate, this.endDate)
+        ]);
+        this.$nextTick(() => this.renderChart());
+      } catch (e) { console.error(e); }
       this.loading = false;
+      this.chartLoading = false;
+    },
+
+    async loadSummary() {
+      this.chartLoading = true;
+      if (this._chart) { this._chart.destroy(); this._chart = null; }
+      try {
+        this.summary = await Api.getBudgetSummary(this.startDate, this.endDate);
+        this.$nextTick(() => this.renderChart());
+      } catch (e) { console.error(e); }
+      this.chartLoading = false;
+    },
+
+    setThisMonth() {
+      const today = new Date();
+      this.startDate = currentMonth() + '-01';
+      this.endDate = today.toISOString().slice(0, 10);
+      this.rangeMode = 'month';
+      this.loadSummary();
+    },
+
+    setLastMonth() {
+      const d = new Date();
+      d.setDate(1);
+      d.setMonth(d.getMonth() - 1);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const lastDay = new Date(y, d.getMonth() + 1, 0).getDate();
+      this.startDate = `${y}-${m}-01`;
+      this.endDate = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
+      this.rangeMode = 'last';
+      this.loadSummary();
+    },
+
+    renderChart() {
+      const canvas = document.getElementById('budgetChart');
+      if (!canvas) return;
+
+      const rows = (this.summary?.rows || [])
+        .filter(r => r.direction !== 'income' && (r.budget > 0 || r.actual > 0))
+        .sort((a, b) => (b.budget || b.actual) - (a.budget || a.actual))
+        .slice(0, 14);
+
+      if (this._chart) { this._chart.destroy(); this._chart = null; }
+
+      const labels   = rows.map(r => (r.emoji ? r.emoji + ' ' : '') + r.name);
+      const budgets  = rows.map(r => r.budget || 0);
+      const actuals  = rows.map(r => r.actual || 0);
+      const colors   = rows.map(r => {
+        if (!r.budget) return 'rgba(99,102,241,0.75)';
+        const ratio = r.actual / r.budget;
+        if (ratio >= 1)   return 'rgba(239,68,68,0.85)';
+        if (ratio >= 0.8) return 'rgba(234,179,8,0.85)';
+        return 'rgba(34,197,94,0.85)';
+      });
+
+      this._chart = new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: '預算',
+              data: budgets,
+              backgroundColor: 'rgba(100,116,139,0.25)',
+              borderColor: 'rgba(100,116,139,0.5)',
+              borderWidth: 1,
+              borderRadius: 3,
+            },
+            {
+              label: '實際',
+              data: actuals,
+              backgroundColor: colors,
+              borderWidth: 0,
+              borderRadius: 3,
+            }
+          ]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: '#9ca3af', font: { size: 11 }, boxWidth: 12 } },
+            tooltip: {
+              callbacks: {
+                label: ctx => ` ${ctx.dataset.label}: $${Number(ctx.raw).toLocaleString('zh-TW')}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: {
+                color: '#6b7280', font: { size: 10 },
+                callback: v => v === 0 ? '' : '$' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v)
+              },
+              grid: { color: 'rgba(255,255,255,0.04)' }
+            },
+            y: {
+              ticks: { color: '#d1d5db', font: { size: 11 } },
+              grid: { display: false }
+            }
+          }
+        }
+      });
     }
   };
 }
