@@ -152,6 +152,7 @@ function AddModal() {
     selectedAccount: null,
     fromAccountId: null,   // 轉帳：來源帳戶
     toAccountId: null,     // 轉帳：目標帳戶
+    pickerParentId: null,  // 兩層分類：已選父類別 id（null = 顯示第一層）
     categories: [],
     accounts: [],
     loading: false,
@@ -177,6 +178,7 @@ function AddModal() {
       this.step = 'amount'; this.amountStr = ''; this.selectedCat = null;
       this.note = ''; this.selectedAccount = null; this.direction = 'expense';
       this.fromAccountId = null; this.toAccountId = null;
+      this.pickerParentId = null;
       this.done = false;
     },
 
@@ -193,16 +195,30 @@ function AddModal() {
 
     get amount() { return parseFloat(this.amountStr) || 0; },
 
-    get expenseCats() {
+    // 父類別（第一層群組標題）
+    get parentCats() {
+      return this.categories.filter(c => c.group === 'parent');
+    },
+    // 獨立支出類別（無父類別、非 parent/income/savings/other/transfer 群組、sort < 90）
+    get independentExpenseCats() {
+      const excludeGroups = new Set(['parent', 'income', 'savings', 'other', 'transfer']);
       return this.categories.filter(c =>
-        ['fixed', 'variable', 'special'].includes(c.group)
+        !excludeGroups.has(c.group) && !c.parent_id && Number(c.sort_order) < 90
       );
+    },
+    // 目前選定父類別的子類別
+    get childCats() {
+      if (!this.pickerParentId) return [];
+      return this.categories.filter(c =>
+        c.parent_id === this.pickerParentId && Number(c.sort_order) < 90
+      );
+    },
+    get pickerParentCat() {
+      if (!this.pickerParentId) return null;
+      return this.categories.find(c => c.id === this.pickerParentId) || null;
     },
     get incomeCats() {
       return this.categories.filter(c => c.group === 'income' || c.group === 'savings');
-    },
-    get displayCats() {
-      return this.direction === 'expense' ? this.expenseCats : this.incomeCats;
     },
     get nonCreditAccounts() {
       return this.accounts.filter(a => a.type !== 'credit');
@@ -215,8 +231,13 @@ function AddModal() {
       }
     },
 
+    selectParent(cat) {
+      this.pickerParentId = cat.id;
+    },
+
     selectCat(cat) {
       this.selectedCat = cat;
+      this.pickerParentId = null;
       this.step = 'confirm';
     },
 
@@ -353,12 +374,14 @@ function BudgetPage() {
 }
 
 // ============================================================
-// 報表頁（儀表板 + 花費分析圖表）
+// 報表頁（家庭總覽 + 現金流分群 + 花費分析圖表 + 夢想帳戶）
 // ============================================================
 function ReportsPage() {
   return {
-    dashboard: null,
+    overview: null,
+    breakdown: null,
     summary: null,
+    dreamAccounts: [],
     loading: false,
     chartLoading: false,
     month: currentMonth(),
@@ -373,7 +396,6 @@ function ReportsPage() {
       this.startDate = m + '-01';
       this.endDate = today.toISOString().slice(0, 10);
 
-      // 切換到報表 tab 時重繪圖表（x-show 隱藏時 canvas 尺寸為 0）
       this.$watch('$store.nav.tab', tab => {
         if (tab === 'reports' && this.summary && !this._chart) {
           this.$nextTick(() => this.renderChart());
@@ -391,9 +413,11 @@ function ReportsPage() {
       this.loading = true;
       this.chartLoading = true;
       try {
-        [this.dashboard, this.summary] = await Promise.all([
-          Api.getDashboard(this.month),
-          Api.getBudgetSummary(this.startDate, this.endDate)
+        [this.overview, this.breakdown, this.summary, this.dreamAccounts] = await Promise.all([
+          Api.getFamilyOverview(this.month),
+          Api.getCashflowBreakdown(this.month),
+          Api.getBudgetSummary(this.startDate, this.endDate),
+          Api.getDreamAccounts()
         ]);
         this.$nextTick(() => this.renderChart());
       } catch (e) { console.error(e); }
@@ -430,6 +454,23 @@ function ReportsPage() {
       this.endDate = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
       this.rangeMode = 'last';
       this.loadSummary();
+    },
+
+    trendIcon(trend) {
+      if (trend === 'up')   return '↑';
+      if (trend === 'down') return '↓';
+      return '—';
+    },
+
+    trendClass(trend, higherIsBetter) {
+      if (trend === 'N/A' || trend === 'flat') return 'text-gray-500';
+      const good = higherIsBetter ? trend === 'up' : trend === 'down';
+      return good ? 'text-green-400' : 'text-red-400';
+    },
+
+    groupColor(key) {
+      const map = { fixed: '#6366f1', variable: '#3b82f6', growth: '#22c55e', discretionary: '#f97316' };
+      return map[key] || '#6b7280';
     },
 
     renderChart() {

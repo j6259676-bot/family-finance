@@ -35,11 +35,12 @@ const Api = {
   getDashboard(month)      { return this.get('getDashboard', { month }); },
   getMonthlyBudgets(month) { return this.get('getMonthlyBudgets', { month }); },
   getDreamAccounts()       { return this.get('getDreamAccounts'); },
-  getInvestment()          { return this.get('getInvestment'); },
   getRecurringRules()      { return this.get('getRecurringRules'); },
   getBudgetSummary(startDate, endDate) {
     return this.get('getBudgetSummary', { startDate, endDate });
   },
+  getFamilyOverview(month)    { return this.get('getFamilyOverview', { month }); },
+  getCashflowBreakdown(month) { return this.get('getCashflowBreakdown', { month }); },
 
   // 寫入
   addTransaction(data)       { return this.post('addTransaction', data); },

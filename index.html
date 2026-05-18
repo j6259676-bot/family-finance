@@ -318,9 +318,119 @@
         <div class="animate-spin text-3xl">⏳</div>
       </div>
 
-      <div x-show="!loading && dashboard" class="px-4 pt-4 space-y-4">
+      <div x-show="!loading" class="px-4 pt-4 pb-6 space-y-4">
 
-        <!-- 花費分析圖表 -->
+        <!-- ── 家庭總覽 6 指標 ── -->
+        <div x-show="overview">
+          <h3 class="text-gray-400 text-xs uppercase tracking-wider mb-3">家庭總覽・<span x-text="month"></span></h3>
+
+          <!-- 淨資產（大卡片） -->
+          <div class="bg-gradient-to-br from-indigo-900/60 to-purple-900/60 border border-indigo-700/30 rounded-2xl p-5 mb-3">
+            <div class="text-gray-300 text-xs mb-1">家庭淨資產</div>
+            <div class="text-white text-3xl font-bold" x-text="'$' + formatMoney(overview?.netWorth?.current)"></div>
+            <div class="text-gray-400 text-xs mt-2">現金 + 投資 − 信用卡未付款</div>
+          </div>
+
+          <!-- 5 個小指標卡 -->
+          <div class="grid grid-cols-2 gap-2">
+            <!-- 月現金流 -->
+            <div class="bg-[#1a1a2e] rounded-xl p-3">
+              <div class="text-gray-400 text-xs mb-1">本月現金流</div>
+              <div :class="(overview?.monthlyCashflow?.current || 0) >= 0 ? 'text-green-400' : 'text-red-400'"
+                   class="text-lg font-bold"
+                   x-text="((overview?.monthlyCashflow?.current||0)>=0?'+':'') + '$' + formatMoney(overview?.monthlyCashflow?.current)"></div>
+              <div class="flex items-center gap-1 mt-1">
+                <span :class="trendClass(overview?.monthlyCashflow?.trend, true)"
+                      class="text-xs" x-text="trendIcon(overview?.monthlyCashflow?.trend)"></span>
+                <span class="text-gray-500 text-xs">vs 上月</span>
+              </div>
+            </div>
+
+            <!-- 儲蓄率 -->
+            <div class="bg-[#1a1a2e] rounded-xl p-3">
+              <div class="text-gray-400 text-xs mb-1">儲蓄率</div>
+              <div :class="(overview?.savingsRate?.current || 0) >= 20 ? 'text-green-400' : (overview?.savingsRate?.current || 0) >= 10 ? 'text-yellow-400' : 'text-red-400'"
+                   class="text-lg font-bold"
+                   x-text="(overview?.savingsRate?.current ?? '—') + '%'"></div>
+              <div class="flex items-center gap-1 mt-1">
+                <span :class="trendClass(overview?.savingsRate?.trend, true)"
+                      class="text-xs" x-text="trendIcon(overview?.savingsRate?.trend)"></span>
+                <span class="text-gray-500 text-xs">vs 上月</span>
+              </div>
+            </div>
+
+            <!-- 投資資產 -->
+            <div class="bg-[#1a1a2e] rounded-xl p-3">
+              <div class="text-gray-400 text-xs mb-1">投資資產</div>
+              <div class="text-white text-lg font-bold"
+                   x-text="'$' + formatMoney(overview?.investmentAssets?.current)"></div>
+              <div class="text-gray-500 text-xs mt-1">帳戶餘額合計</div>
+            </div>
+
+            <!-- 負債總額 -->
+            <div class="bg-[#1a1a2e] rounded-xl p-3">
+              <div class="text-gray-400 text-xs mb-1">信用卡負債</div>
+              <div class="text-orange-400 text-lg font-bold"
+                   x-text="'$' + formatMoney(overview?.totalDebt?.current)"></div>
+              <div class="text-gray-500 text-xs mt-1">本月未付款合計</div>
+            </div>
+
+            <!-- 緊急預備金（佔 col-span-2） -->
+            <div class="bg-[#1a1a2e] rounded-xl p-3 col-span-2">
+              <div class="text-gray-400 text-xs mb-1">緊急預備金</div>
+              <div class="flex items-end gap-2">
+                <div :class="(overview?.emergencyFund?.months || 0) >= 6 ? 'text-green-400' : (overview?.emergencyFund?.months || 0) >= 3 ? 'text-yellow-400' : 'text-red-400'"
+                     class="text-2xl font-bold"
+                     x-text="(overview?.emergencyFund?.months ?? '—') + ' 個月'"></div>
+                <div class="text-gray-500 text-xs pb-0.5">可支撐固定支出</div>
+              </div>
+              <div class="text-gray-500 text-xs mt-1"
+                   x-text="'現金總額 $' + formatMoney(overview?.emergencyFund?.current)"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── 現金流分群 ── -->
+        <div x-show="breakdown" class="bg-[#1a1a2e] rounded-2xl p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-white font-semibold text-sm">現金流分群</h3>
+            <div class="text-gray-400 text-xs">
+              支出 $<span x-text="formatMoney(breakdown?.totalExpense)"></span>
+            </div>
+          </div>
+          <div class="space-y-2.5">
+            <template x-for="g in (breakdown?.groups || [])" :key="g.key">
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-gray-300 text-xs" x-text="g.name"></span>
+                  <span class="text-gray-300 text-xs">
+                    $<span x-text="formatMoney(g.amount)"></span>
+                    <span class="text-gray-500 ml-1" x-text="'(' + g.pct + '%)'"></span>
+                  </span>
+                </div>
+                <div class="bg-gray-800 rounded-full h-2">
+                  <div class="h-2 rounded-full transition-all"
+                       :style="`width: ${g.pct}%; background-color: ${groupColor(g.key)}`"></div>
+                </div>
+              </div>
+            </template>
+          </div>
+          <!-- 收入 vs 支出 -->
+          <div class="flex gap-2 mt-4">
+            <div class="flex-1 bg-green-900/30 border border-green-800/40 rounded-xl p-2.5 text-center">
+              <div class="text-gray-400 text-xs mb-0.5">本月收入</div>
+              <div class="text-green-400 text-sm font-semibold"
+                   x-text="'$' + formatMoney(breakdown?.totalIncome)"></div>
+            </div>
+            <div class="flex-1 bg-red-900/20 border border-red-800/30 rounded-xl p-2.5 text-center">
+              <div class="text-gray-400 text-xs mb-0.5">本月支出</div>
+              <div class="text-red-400 text-sm font-semibold"
+                   x-text="'$' + formatMoney(breakdown?.totalExpense)"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── 花費分析圖表 ── -->
         <div class="bg-[#1a1a2e] rounded-2xl p-4">
           <div class="flex items-center justify-between mb-3">
             <h3 class="text-white font-semibold text-sm">花費分析</h3>
@@ -377,40 +487,11 @@
           <div x-show="!chartLoading && !summary" class="text-center py-8 text-gray-500 text-sm">載入中…</div>
         </div>
 
-        <!-- 淨資產 -->
-        <div class="bg-gradient-to-br from-indigo-900/50 to-purple-900/50 border border-indigo-700/30 rounded-2xl p-5">
-          <div class="text-gray-300 text-sm mb-1">家庭淨資產（估算）</div>
-          <div class="text-white text-3xl font-bold" x-text="'$' + formatMoney(dashboard?.netWorth)"></div>
-          <div class="text-gray-400 text-xs mt-2">現金 + 投資 − 信用卡未付款</div>
-        </div>
-
-        <!-- 投資快照 -->
-        <div x-show="dashboard?.investment" class="bg-[#1a1a2e] rounded-2xl p-4">
-          <div class="text-gray-400 text-xs mb-3">投資總覽（最新週報）</div>
-          <div class="flex items-end justify-between">
-            <div>
-              <div class="text-white text-2xl font-bold"
-                   x-text="'$' + formatMoney(dashboard?.investment?.total_value)"></div>
-              <div class="text-gray-400 text-xs mt-1"
-                   x-text="'更新日：' + (dashboard?.investment?.snapshot_date || '—')"></div>
-            </div>
-            <div class="text-right">
-              <div :class="(dashboard?.investment?.weekly_change || 0) >= 0 ? 'text-green-400' : 'text-red-400'"
-                   class="text-lg font-semibold"
-                   x-text="((dashboard?.investment?.weekly_change || 0) >= 0 ? '+' : '') + '$' + formatMoney(dashboard?.investment?.weekly_change)"></div>
-              <div class="text-gray-500 text-xs">本週</div>
-            </div>
-          </div>
-        </div>
-        <div x-show="!dashboard?.investment" class="bg-[#1a1a2e] rounded-2xl p-4 text-center">
-          <div class="text-gray-500 text-sm">尚未匯入投資週報快照</div>
-        </div>
-
-        <!-- 夢想帳戶 -->
-        <div>
+        <!-- ── 夢想帳戶 ── -->
+        <div x-show="dreamAccounts.length > 0">
           <h3 class="text-gray-400 text-xs uppercase tracking-wider mb-3">夢想帳戶</h3>
           <div class="space-y-2">
-            <template x-for="d in (dashboard?.dreamAccounts || [])" :key="d.id">
+            <template x-for="d in dreamAccounts" :key="d.id">
               <div class="bg-[#1a1a2e] rounded-xl px-4 py-3">
                 <div class="flex items-center justify-between mb-2">
                   <div class="flex items-center gap-2">
@@ -596,21 +677,71 @@
     <!-- Step: 類別 -->
     <div x-show="step === 'category'" class="flex-1 overflow-y-auto px-4 pb-6">
       <div class="flex items-center gap-3 py-3 mb-2">
-        <button @click="step = 'amount'" class="text-gray-400 text-sm">← 回去</button>
+        <button @click="pickerParentId ? pickerParentId = null : step = 'amount'"
+                class="text-gray-400 text-sm">← 回去</button>
         <div class="text-white font-medium">
-          <span x-text="direction === 'expense' ? '支出' : '收入'"></span>
+          <span x-show="!pickerParentId" x-text="direction === 'expense' ? '支出' : '收入'"></span>
+          <span x-show="pickerParentId" x-text="pickerParentCat?.icon + ' ' + pickerParentCat?.name"></span>
           <span class="text-indigo-400 ml-2" x-text="'$' + amountStr"></span>
         </div>
       </div>
-      <div class="grid grid-cols-3 gap-2">
-        <template x-for="cat in displayCats" :key="cat.id">
+
+      <!-- 收入：平鋪顯示 -->
+      <div x-show="direction === 'income'" class="grid grid-cols-3 gap-2">
+        <template x-for="cat in incomeCats" :key="cat.id">
           <button @click="selectCat(cat)"
-                  :class="selectedCat?.id === cat.id ? 'selected' : ''"
                   class="cat-btn text-center">
             <span class="text-2xl" x-text="cat.icon || '•'"></span>
             <span class="text-xs text-gray-300 leading-tight text-center" x-text="cat.name"></span>
           </button>
         </template>
+      </div>
+
+      <!-- 支出：兩層選擇器 -->
+      <div x-show="direction === 'expense'">
+
+        <!-- 第一層：父類別 + 獨立類別 -->
+        <div x-show="!pickerParentId">
+          <!-- 父類別（點選展開子類別） -->
+          <div x-show="parentCats.length > 0" class="mb-3">
+            <div class="text-gray-500 text-xs px-1 mb-2">選擇類別群組</div>
+            <div class="grid grid-cols-3 gap-2">
+              <template x-for="cat in parentCats" :key="cat.id">
+                <button @click="selectParent(cat)"
+                        class="cat-btn text-center relative">
+                  <span class="text-2xl" x-text="cat.icon || '•'"></span>
+                  <span class="text-xs text-gray-300 leading-tight text-center" x-text="cat.name"></span>
+                  <span class="absolute top-1 right-1 text-gray-500 text-xs">›</span>
+                </button>
+              </template>
+            </div>
+          </div>
+          <!-- 獨立類別（直接記帳） -->
+          <div x-show="independentExpenseCats.length > 0">
+            <div class="text-gray-500 text-xs px-1 mb-2">獨立類別</div>
+            <div class="grid grid-cols-3 gap-2">
+              <template x-for="cat in independentExpenseCats" :key="cat.id">
+                <button @click="selectCat(cat)"
+                        class="cat-btn text-center">
+                  <span class="text-2xl" x-text="cat.icon || '•'"></span>
+                  <span class="text-xs text-gray-300 leading-tight text-center" x-text="cat.name"></span>
+                </button>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- 第二層：子類別 -->
+        <div x-show="pickerParentId" class="grid grid-cols-3 gap-2">
+          <template x-for="cat in childCats" :key="cat.id">
+            <button @click="selectCat(cat)"
+                    class="cat-btn text-center">
+              <span class="text-2xl" x-text="cat.icon || '•'"></span>
+              <span class="text-xs text-gray-300 leading-tight text-center" x-text="cat.name"></span>
+            </button>
+          </template>
+        </div>
+
       </div>
     </div>
 
