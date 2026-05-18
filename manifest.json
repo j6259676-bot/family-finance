@@ -1,0 +1,14 @@
+{
+  "name": "家庭財務",
+  "short_name": "家庭財務",
+  "description": "James & 佳文 家庭收支記帳",
+  "start_url": "/family-finance/",
+  "scope": "/family-finance/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d0d1a",
+  "theme_color": "#1D292E",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- 背景 -->
+  <rect width="512" height="512" rx="90" fill="#1D292E"/>
+  <!-- 屋頂 -->
+  <polygon points="256,64 60,256 452,256" fill="#FFCC32"/>
+  <!-- 屋身 -->
+  <rect x="104" y="242" width="304" height="206" fill="#FFCC32"/>
+  <!-- 門 -->
+  <rect x="200" y="320" width="112" height="128" rx="10" fill="#1D292E"/>
+  <!-- 左窗 -->
+  <rect x="130" y="286" width="52" height="52" rx="7" fill="#1D292E"/>
+  <!-- 右窗 -->
+  <rect x="330" y="286" width="52" height="52" rx="7" fill="#1D292E"/>
+</svg>
