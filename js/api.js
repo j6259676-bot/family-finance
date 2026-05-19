@@ -41,6 +41,9 @@ const Api = {
   },
   getFamilyOverview(month)    { return this.get('getFamilyOverview', { month }); },
   getCashflowBreakdown(month) { return this.get('getCashflowBreakdown', { month }); },
+  getAccountTransactions(accountId, monthsBack = 3) {
+    return this.get('getAccountTransactions', { accountId, monthsBack });
+  },
 
   // 寫入
   addTransaction(data)       { return this.post('addTransaction', data); },

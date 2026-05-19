@@ -29,6 +29,21 @@
                font-size: 1.5rem; display: flex; align-items: center; justify-content: center;
                cursor: pointer; transition: background 0.1s; }
     .num-btn:active { background: #2d2d50; }
+    /* 計算機鍵盤樣式 */
+    .calc-num-btn { background: #1e1e35; height: 68px; display: flex; align-items: center;
+                    justify-content: center; font-size: 1.4rem; color: #fff; cursor: pointer;
+                    transition: background 0.1s; user-select: none; }
+    .calc-num-btn:active { background: #2d2d50; }
+    .calc-op-btn { background: #c05a21; height: 68px; display: flex; align-items: center;
+                   justify-content: center; font-size: 1.5rem; color: #fff; cursor: pointer;
+                   transition: background 0.1s; user-select: none; }
+    .calc-op-btn:active { background: #e06a28; }
+    .calc-eq-btn { background: #4f46e5; height: 68px; display: flex; align-items: center;
+                   justify-content: center; font-size: 1.4rem; color: #fff; cursor: pointer;
+                   transition: background 0.1s; user-select: none; }
+    .calc-eq-btn:active { background: #6366f1; }
+    .calc-dim-btn { background: #1a1a30; height: 68px; display: flex; align-items: center;
+                    justify-content: center; font-size: 0.85rem; color: #6b7280; user-select: none; }
     .cat-btn { padding: 12px 8px; border-radius: 12px; background: #1e1e35;
                display: flex; flex-direction: column; align-items: center; gap: 4px;
                cursor: pointer; transition: all 0.1s; border: 2px solid transparent; }
@@ -230,13 +245,17 @@
         </div>
         <div class="space-y-2 mb-6">
           <template x-for="acc in bankAccounts" :key="acc.id">
-            <div class="bg-[#1a1a2e] rounded-xl px-4 py-3 flex items-center justify-between">
+            <button @click="openAccount(acc)"
+                    class="w-full bg-[#1a1a2e] hover:bg-[#22223a] active:bg-[#2a2a45] rounded-xl px-4 py-3 flex items-center justify-between transition-colors text-left">
               <div>
                 <div class="font-medium text-sm text-white" x-text="acc.name"></div>
                 <div class="text-xs text-gray-500" x-text="acc.owner === 'jiawen' ? '佳文' : acc.owner === 'james' ? 'James' : '共同'"></div>
               </div>
-              <div class="text-green-400 font-semibold text-sm" x-text="'$' + formatMoney(acc.balance)"></div>
-            </div>
+              <div class="flex items-center gap-2">
+                <div class="text-green-400 font-semibold text-sm" x-text="'$' + formatMoney(acc.balance)"></div>
+                <span class="text-gray-600 text-xs">›</span>
+              </div>
+            </button>
           </template>
         </div>
 
@@ -244,16 +263,93 @@
         <h3 class="text-gray-400 text-xs uppercase tracking-wider mb-3">信用卡</h3>
         <div class="space-y-2">
           <template x-for="acc in creditCards" :key="acc.id">
-            <div class="bg-[#1a1a2e] rounded-xl px-4 py-3 flex items-center justify-between">
+            <button @click="openAccount(acc)"
+                    class="w-full bg-[#1a1a2e] hover:bg-[#22223a] active:bg-[#2a2a45] rounded-xl px-4 py-3 flex items-center justify-between transition-colors text-left">
               <div>
                 <div class="font-medium text-sm text-white" x-text="acc.name"></div>
                 <div class="text-xs text-gray-500" x-text="acc.owner === 'jiawen' ? '佳文' : 'James'"></div>
               </div>
-              <div class="text-red-400 font-semibold text-sm" x-text="'$' + formatMoney(acc.balance)"></div>
-            </div>
+              <div class="flex items-center gap-2">
+                <div class="text-red-400 font-semibold text-sm" x-text="'$' + formatMoney(acc.balance)"></div>
+                <span class="text-gray-600 text-xs">›</span>
+              </div>
+            </button>
           </template>
         </div>
       </div>
+
+      <!-- 帳戶明細 Drawer（手機：全螢幕 modal；桌面：右側 panel） -->
+      <div x-show="showDrawer"
+           x-transition:enter="transition ease-out duration-200"
+           x-transition:enter-start="opacity-0 translate-x-full"
+           x-transition:enter-end="opacity-100 translate-x-0"
+           x-transition:leave="transition ease-in duration-150"
+           x-transition:leave-start="opacity-100 translate-x-0"
+           x-transition:leave-end="opacity-0 translate-x-full"
+           class="fixed inset-0 lg:inset-y-0 lg:left-auto lg:right-0 lg:w-96 z-40 flex flex-col bg-[#111126] border-l border-gray-800">
+
+        <!-- Drawer 標題 -->
+        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-800">
+          <div>
+            <div class="font-semibold text-white" x-text="selectedAcc?.name"></div>
+            <div class="text-xs text-gray-500"
+                 x-text="'近 ' + accMonthsBack + ' 個月記錄'"></div>
+          </div>
+          <button @click="closeDrawer()" class="text-gray-400 hover:text-white text-2xl leading-none">×</button>
+        </div>
+
+        <!-- 帳戶收支摘要 -->
+        <div class="grid grid-cols-2 gap-2 px-5 py-3 border-b border-gray-800">
+          <div class="bg-[#1a1a2e] rounded-xl p-3 text-center">
+            <div class="text-gray-400 text-xs mb-1">收入</div>
+            <div class="text-green-400 text-sm font-semibold" x-text="'$' + formatMoney(accStats?.totalIncome)"></div>
+          </div>
+          <div class="bg-[#1a1a2e] rounded-xl p-3 text-center">
+            <div class="text-gray-400 text-xs mb-1">支出</div>
+            <div class="text-red-400 text-sm font-semibold" x-text="'$' + formatMoney(accStats?.totalExpense)"></div>
+          </div>
+        </div>
+
+        <!-- 交易列表 -->
+        <div class="flex-1 overflow-y-auto px-5 py-3">
+          <div x-show="accTxLoading" class="flex justify-center py-8">
+            <div class="animate-spin text-2xl">⏳</div>
+          </div>
+          <div x-show="!accTxLoading">
+            <template x-for="group in accTxGrouped" :key="group.date">
+              <div class="mb-4">
+                <div class="text-gray-500 text-xs mb-2 sticky top-0 bg-[#111126] py-1"
+                     x-text="group.date"></div>
+                <div class="space-y-1.5">
+                  <template x-for="tx in group.txs" :key="tx.id">
+                    <div class="bg-[#1a1a2e] rounded-xl px-3 py-2.5 flex items-center gap-2">
+                      <span class="text-xl w-8 text-center" x-text="tx.cat_icon || '•'"></span>
+                      <div class="flex-1 min-w-0">
+                        <div class="text-white text-xs font-medium" x-text="tx.cat_name"></div>
+                        <div x-show="tx.note" class="text-gray-500 text-xs truncate" x-text="tx.note"></div>
+                      </div>
+                      <div :class="tx.direction === 'income' ? 'text-green-400' : tx.direction === 'transfer' ? 'text-orange-400' : 'text-white'"
+                           class="text-xs font-semibold whitespace-nowrap"
+                           x-text="(tx.direction === 'income' ? '+' : tx.direction === 'transfer' ? '↔' : '-') + '$' + formatMoney(tx.amount)"></div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+            <div x-show="accTxGrouped.length === 0 && !accTxLoading" class="text-center py-8 text-gray-500 text-sm">
+              這個帳戶近 <span x-text="accMonthsBack"></span> 個月沒有記錄
+            </div>
+            <button x-show="accTxGrouped.length > 0" @click="loadMoreAccTx()"
+                    class="w-full text-gray-400 text-xs py-3 hover:text-white transition-colors">
+              載入更多（再 3 個月）
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Drawer 背景遮罩（手機） -->
+      <div x-show="showDrawer" @click="closeDrawer()"
+           class="lg:hidden fixed inset-0 bg-black/50 z-30"></div>
     </div>
 
     <!-- 預算頁 -->
@@ -264,11 +360,25 @@
         <div class="animate-spin text-3xl">⏳</div>
       </div>
 
-      <div x-show="!loading && dashboard" class="px-4 pt-4">
+      <div x-show="!loading && dashboard && mode === 'view'" class="px-4 pt-4">
 
-        <!-- 月份標題 + 總覽 -->
-        <div class="bg-[#1a1a2e] rounded-2xl p-4 mb-6">
-          <div class="text-gray-400 text-xs mb-2" x-text="month + ' 預算總覽'"></div>
+        <!-- 月份切換器 + 家庭會議按鈕 -->
+        <div class="flex items-center justify-between mb-4">
+          <select x-model="month" @change="loadData()"
+                  class="bg-[#1e1e35] border border-gray-700 text-white text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-400">
+            <template x-for="m in monthOptions" :key="m">
+              <option :value="m" x-text="m"></option>
+            </template>
+          </select>
+          <button @click="enterEditMode()"
+                  class="hidden lg:flex items-center gap-1.5 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 text-sm px-4 py-2 rounded-xl transition-colors border border-indigo-700/40">
+            <span>📝</span><span>家庭會議</span>
+          </button>
+        </div>
+
+        <!-- 月份總覽 -->
+        <div class="bg-[#1a1a2e] rounded-2xl p-4 mb-4">
+          <div class="text-gray-400 text-xs mb-2" x-text="month + ' 收支總覽'"></div>
           <div class="grid grid-cols-3 gap-4 text-center">
             <div>
               <div class="text-green-400 font-bold text-lg" x-text="'$' + formatMoney(dashboard?.income?.total)"></div>
@@ -286,6 +396,27 @@
           </div>
         </div>
 
+        <!-- 總預算剩餘警示卡 -->
+        <div x-show="totalBudget > 0"
+             :class="warnLevel === 'over' ? 'border-red-700/50 bg-red-900/20' : warnLevel === 'warning' ? 'border-yellow-700/50 bg-yellow-900/20' : 'border-indigo-700/30 bg-indigo-900/10'"
+             class="border rounded-2xl p-4 mb-4">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-gray-300 text-xs">預算使用狀況</span>
+            <span :class="warnLevel === 'over' ? 'text-red-400' : warnLevel === 'warning' ? 'text-yellow-400' : 'text-green-400'"
+                  class="text-xs font-medium" x-text="usagePct + '%'"></span>
+          </div>
+          <div class="bg-gray-800 rounded-full h-2 mb-2">
+            <div :class="warnLevel === 'over' ? 'bg-red-500' : warnLevel === 'warning' ? 'bg-yellow-500' : 'bg-indigo-500'"
+                 class="h-2 rounded-full transition-all"
+                 :style="`width: ${usagePct}%`"></div>
+          </div>
+          <div class="flex justify-between text-xs">
+            <span class="text-gray-400">已用 $<span x-text="formatMoney(totalActual)"></span></span>
+            <span :class="totalRemaining >= 0 ? 'text-green-400' : 'text-red-400'"
+                  x-text="totalRemaining >= 0 ? '剩 $' + formatMoney(totalRemaining) : '超 $' + formatMoney(-totalRemaining)"></span>
+          </div>
+        </div>
+
         <!-- 待分類提醒 -->
         <div x-show="dashboard?.uncategorized?.count > 0"
              class="bg-yellow-900/30 border border-yellow-700/50 rounded-xl px-4 py-3 mb-4 flex items-center gap-2">
@@ -294,12 +425,12 @@
                 x-text="`有 ${dashboard?.uncategorized?.count ?? 0} 筆待分類（共 $${formatMoney(dashboard?.uncategorized?.amount ?? 0)}）`"></span>
         </div>
 
-        <!-- 各類別預算進度 -->
+        <!-- 各類別預算進度（只顯示父類別或獨立類別） -->
         <div class="space-y-2">
           <template x-for="item in (dashboard?.budgetSummary || [])" :key="item.category_id">
-            <div x-show="item.budget > 0 || item.actual > 0"
+            <div x-show="!item.parent_id && (item.budget > 0 || item.actual > 0)"
                  class="bg-[#1a1a2e] rounded-xl px-4 py-3">
-              <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center justify-between mb-1">
                 <div class="flex items-center gap-2">
                   <span class="text-lg" x-text="item.icon || '•'"></span>
                   <span class="text-sm font-medium text-white" x-text="item.category_name"></span>
@@ -307,15 +438,187 @@
                 <div class="text-right">
                   <span :class="statusColor(item.status)" class="text-sm font-semibold"
                         x-text="'$' + formatMoney(item.actual)"></span>
-                  <span class="text-gray-500 text-xs" x-text="' / $' + formatMoney(item.budget)"></span>
+                  <span class="text-gray-500 text-xs" x-text="item.budget > 0 ? ' / $' + formatMoney(item.budget) : ''"></span>
                 </div>
               </div>
-              <div x-show="item.budget > 0" class="bg-gray-800 rounded-full h-1.5">
+              <div x-show="item.budget > 0" class="bg-gray-800 rounded-full h-1.5 mb-1">
                 <div :class="barColor(item.status)" class="h-1.5 rounded-full transition-all"
                      :style="`width: ${pct(item.actual, item.budget)}%`"></div>
               </div>
+              <!-- 剩餘/超支小字 -->
+              <div x-show="item.budget > 0" class="text-right">
+                <span :class="item.remaining >= 0 ? 'text-gray-500' : 'text-red-400'"
+                      class="text-xs"
+                      x-text="item.remaining >= 0 ? '剩 $' + formatMoney(item.remaining) : '超 $' + formatMoney(-item.remaining)"></span>
+              </div>
             </div>
           </template>
+        </div>
+      </div>
+
+      <!-- ====== 家庭會議模式（桌面版） ====== -->
+      <div x-show="!loading && mode === 'edit'" class="px-4 pt-4 pb-8 max-w-4xl mx-auto">
+
+        <!-- 標題列 -->
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-white text-lg font-bold">📝 家庭會議・預算編列</h2>
+            <div class="flex items-center gap-2 mt-1">
+              <span class="text-gray-400 text-sm">編列月份：</span>
+              <select x-model="editMonth"
+                      class="bg-[#1e1e35] border border-gray-700 text-white text-sm rounded-lg px-2 py-1 focus:outline-none focus:border-indigo-400">
+                <template x-for="m in monthOptions" :key="m">
+                  <option :value="m" x-text="m"></option>
+                </template>
+              </select>
+            </div>
+          </div>
+          <button @click="exitEditMode()"
+                  class="text-gray-400 hover:text-white text-sm px-4 py-2 rounded-xl border border-gray-700 hover:border-gray-500 transition-colors">
+            ← 返回
+          </button>
+        </div>
+
+        <!-- 三段公式計算（頂部摘要） -->
+        <div class="bg-[#1a1a2e] rounded-2xl p-4 mb-6 grid grid-cols-2 lg:grid-cols-4 gap-3 text-center">
+          <div>
+            <div class="text-green-400 font-bold text-lg" x-text="'$' + formatMoney(editTotalIncome)"></div>
+            <div class="text-gray-500 text-xs">A 預計收入</div>
+          </div>
+          <div>
+            <div class="text-orange-400 font-bold text-lg" x-text="'$' + formatMoney(editTotalFixed + editTotalSavings)"></div>
+            <div class="text-gray-500 text-xs">B 固定 + 儲蓄</div>
+          </div>
+          <div>
+            <div :class="editAllocatable >= 0 ? 'text-indigo-400' : 'text-red-400'"
+                 class="font-bold text-lg" x-text="'$' + formatMoney(editAllocatable)"></div>
+            <div class="text-gray-500 text-xs">C 可分配 (A−B)</div>
+          </div>
+          <div>
+            <div :class="editUnallocated >= 0 ? 'text-green-400' : 'text-red-400'"
+                 class="font-bold text-lg" x-text="(editUnallocated >= 0 ? '' : '-') + '$' + formatMoney(Math.abs(editUnallocated))"></div>
+            <div class="text-gray-500 text-xs" x-text="editUnallocated >= 0 ? '未分配餘額' : '⚠️ 已超分配'"></div>
+          </div>
+        </div>
+
+        <!-- 可分配進度條 -->
+        <div x-show="editAllocatable > 0" class="bg-[#1a1a2e] rounded-xl px-4 py-3 mb-6">
+          <div class="flex justify-between text-xs text-gray-400 mb-1.5">
+            <span>非固定分配進度</span>
+            <span x-text="'$' + formatMoney(editTotalVariable) + ' / $' + formatMoney(editAllocatable)"></span>
+          </div>
+          <div class="bg-gray-800 rounded-full h-2">
+            <div :class="editUnallocated < 0 ? 'bg-red-500' : editTotalVariable / editAllocatable > 0.9 ? 'bg-yellow-500' : 'bg-indigo-500'"
+                 class="h-2 rounded-full transition-all"
+                 :style="`width: ${Math.min(100, Math.round(editTotalVariable / editAllocatable * 100))}%`"></div>
+          </div>
+        </div>
+
+        <!-- 區塊：收入 -->
+        <div class="mb-6">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-green-400 text-sm font-semibold uppercase tracking-wider">收入</h3>
+            <button @click="applyAllLastMonth('income')" class="text-xs text-gray-400 hover:text-white transition-colors">沿用上月實際 →</button>
+          </div>
+          <div class="space-y-1">
+            <template x-for="cat in editCats('income')" :key="cat.category_id">
+              <div class="bg-[#1a1a2e] rounded-xl px-4 py-3 flex items-center gap-3">
+                <span class="text-lg w-8 text-center" x-text="cat.icon || '•'"></span>
+                <div class="flex-1">
+                  <div class="text-white text-sm" x-text="cat.category_name"></div>
+                  <div class="text-gray-500 text-xs" x-text="'上月實際：$' + formatMoney(lastMonthActual(cat.category_id))"></div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button @click="applyLastMonth(cat.category_id)" class="text-xs text-gray-500 hover:text-indigo-400">套用</button>
+                  <input type="number" x-model.number="editBudgets[cat.category_id]"
+                         class="w-28 bg-[#0d0d1a] border border-gray-700 rounded-lg px-3 py-1.5 text-white text-sm text-right focus:outline-none focus:border-green-500" placeholder="0">
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- 區塊：固定支出 -->
+        <div class="mb-6">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-orange-400 text-sm font-semibold uppercase tracking-wider">固定支出</h3>
+            <button @click="applyAllLastMonth('fixed')" class="text-xs text-gray-400 hover:text-white transition-colors">沿用上月實際 →</button>
+          </div>
+          <div class="space-y-1">
+            <template x-for="cat in editCats('fixed')" :key="cat.category_id">
+              <div class="bg-[#1a1a2e] rounded-xl px-4 py-3 flex items-center gap-3">
+                <span class="text-lg w-8 text-center" x-text="cat.icon || '•'"></span>
+                <div class="flex-1">
+                  <div class="text-white text-sm" x-text="cat.category_name"></div>
+                  <div class="text-gray-500 text-xs" x-text="'上月實際：$' + formatMoney(lastMonthActual(cat.category_id))"></div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button @click="applyLastMonth(cat.category_id)" class="text-xs text-gray-500 hover:text-indigo-400">套用</button>
+                  <input type="number" x-model.number="editBudgets[cat.category_id]"
+                         class="w-28 bg-[#0d0d1a] border border-gray-700 rounded-lg px-3 py-1.5 text-white text-sm text-right focus:outline-none focus:border-orange-500" placeholder="0">
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- 區塊：儲蓄 -->
+        <div class="mb-6">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-indigo-400 text-sm font-semibold uppercase tracking-wider">預計存款</h3>
+            <button @click="applyAllLastMonth('savings')" class="text-xs text-gray-400 hover:text-white transition-colors">沿用上月實際 →</button>
+          </div>
+          <div class="space-y-1">
+            <template x-for="cat in editCats('savings')" :key="cat.category_id">
+              <div class="bg-[#1a1a2e] rounded-xl px-4 py-3 flex items-center gap-3">
+                <span class="text-lg w-8 text-center" x-text="cat.icon || '•'"></span>
+                <div class="flex-1">
+                  <div class="text-white text-sm" x-text="cat.category_name"></div>
+                  <div class="text-gray-500 text-xs" x-text="'上月實際：$' + formatMoney(lastMonthActual(cat.category_id))"></div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button @click="applyLastMonth(cat.category_id)" class="text-xs text-gray-500 hover:text-indigo-400">套用</button>
+                  <input type="number" x-model.number="editBudgets[cat.category_id]"
+                         class="w-28 bg-[#0d0d1a] border border-gray-700 rounded-lg px-3 py-1.5 text-white text-sm text-right focus:outline-none focus:border-indigo-500" placeholder="0">
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- 區塊：非固定支出（variable/growth/discretionary） -->
+        <template x-for="[grpKey, grpLabel, grpColor] in [['variable','生活支出','blue'],['growth','成長支出','green'],['discretionary','自由使用','purple']]" :key="grpKey">
+          <div class="mb-6" x-show="editCats(grpKey).length > 0">
+            <div class="flex items-center justify-between mb-2">
+              <h3 :class="grpColor === 'blue' ? 'text-blue-400' : grpColor === 'green' ? 'text-green-400' : 'text-purple-400'"
+                  class="text-sm font-semibold uppercase tracking-wider" x-text="grpLabel"></h3>
+              <button @click="applyAllLastMonth(grpKey)" class="text-xs text-gray-400 hover:text-white transition-colors">沿用上月實際 →</button>
+            </div>
+            <div class="space-y-1">
+              <template x-for="cat in editCats(grpKey)" :key="cat.category_id">
+                <div class="bg-[#1a1a2e] rounded-xl px-4 py-3 flex items-center gap-3">
+                  <span class="text-lg w-8 text-center" x-text="cat.icon || '•'"></span>
+                  <div class="flex-1">
+                    <div class="text-white text-sm" x-text="cat.category_name"></div>
+                    <div class="text-gray-500 text-xs" x-text="'上月實際：$' + formatMoney(lastMonthActual(cat.category_id))"></div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button @click="applyLastMonth(cat.category_id)" class="text-xs text-gray-500 hover:text-indigo-400">套用</button>
+                    <input type="number" x-model.number="editBudgets[cat.category_id]"
+                           class="w-28 bg-[#0d0d1a] border border-gray-700 rounded-lg px-3 py-1.5 text-white text-sm text-right focus:outline-none focus:border-blue-500" placeholder="0">
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+
+        <!-- 儲存按鈕 -->
+        <div class="sticky bottom-4 mt-4">
+          <button @click="saveBudgets()"
+                  class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-4 rounded-2xl text-lg transition-colors shadow-lg">
+            💾 儲存 <span x-text="editMonth"></span> 預算
+          </button>
         </div>
       </div>
     </div>
@@ -597,19 +900,37 @@
     <div x-show="step === 'amount'" class="flex-1 overflow-y-auto">
 
       <!-- 金額顯示 -->
-      <div class="text-center py-6 px-5">
-        <div class="text-5xl font-light text-white min-h-[60px]"
-             x-text="amountStr ? '$' + amountStr : '$0'"></div>
+      <div class="text-center py-4 px-5">
+        <div class="text-4xl font-light text-white min-h-[52px] tracking-wide"
+             x-text="expression ? expression : '0'"></div>
+        <div class="text-sm text-indigo-300 h-5 mt-1" x-text="displayResult"></div>
       </div>
 
-      <!-- 數字鍵盤 -->
-      <div class="grid grid-cols-3 gap-3 px-8 pb-4">
-        <template x-for="n in [1,2,3,4,5,6,7,8,9]" :key="n">
-          <button @click="pressNum(n)" class="num-btn mx-auto text-white font-medium" x-text="n"></button>
-        </template>
-        <button @click="pressDot()" class="num-btn mx-auto text-white">.</button>
-        <button @click="pressNum(0)" class="num-btn mx-auto text-white font-medium">0</button>
-        <button @click="pressBack()" class="num-btn mx-auto text-gray-400">⌫</button>
+      <!-- 計算機鍵盤（Money Pro 風格，5欄4列） -->
+      <div class="grid pb-2" style="grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 1px; background: #0d0d1a; padding: 0 1px;">
+        <!-- 行 1 -->
+        <button @click="pressOp('+')" class="calc-op-btn">+</button>
+        <button @click="pressNum(1)" class="calc-num-btn">1</button>
+        <button @click="pressNum(2)" class="calc-num-btn">2</button>
+        <button @click="pressNum(3)" class="calc-num-btn">3</button>
+        <button class="calc-dim-btn opacity-30 cursor-not-allowed">TWD</button>
+        <!-- 行 2 -->
+        <button @click="pressOp('-')" class="calc-op-btn">−</button>
+        <button @click="pressNum(4)" class="calc-num-btn">4</button>
+        <button @click="pressNum(5)" class="calc-num-btn">5</button>
+        <button @click="pressNum(6)" class="calc-num-btn">6</button>
+        <button class="calc-dim-btn opacity-30 cursor-not-allowed">±</button>
+        <!-- 行 3 -->
+        <button @click="pressOp('×')" class="calc-op-btn">×</button>
+        <button @click="pressNum(7)" class="calc-num-btn">7</button>
+        <button @click="pressNum(8)" class="calc-num-btn">8</button>
+        <button @click="pressNum(9)" class="calc-num-btn">9</button>
+        <button @click="pressEqual()" class="calc-eq-btn">=</button>
+        <!-- 行 4 -->
+        <button @click="pressOp('÷')" class="calc-op-btn">÷</button>
+        <button @click="pressDot()" class="calc-num-btn">.</button>
+        <button @click="pressNum(0)" class="calc-num-btn">0</button>
+        <button @click="pressBack()" class="calc-num-btn col-span-2 text-gray-300">⌫</button>
       </div>
 
       <!-- 下一步 -->
@@ -770,7 +1091,14 @@
           <div class="text-gray-400 text-sm" x-text="selectedCat?.name"></div>
           <div :class="direction === 'income' ? 'text-green-400' : 'text-white'"
                class="text-4xl font-bold mt-2"
-               x-text="(direction === 'income' ? '+' : '-') + '$' + amountStr"></div>
+               x-text="(direction === 'income' ? '+' : '-') + '$' + formatMoney(amount)"></div>
+        </div>
+        <!-- 日期選擇 -->
+        <div class="mb-3">
+          <div class="text-gray-500 text-xs mb-1">日期</div>
+          <input type="date" x-model="date"
+                 class="w-full bg-[#0d0d1a] border border-gray-700 rounded-xl px-4 py-3
+                        text-white text-sm focus:outline-none focus:border-indigo-400">
         </div>
         <input x-model="note" type="text" placeholder="備註（可不填）"
                class="w-full bg-[#0d0d1a] border border-gray-700 rounded-xl px-4 py-3
